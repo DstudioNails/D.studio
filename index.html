@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>D.studio 預算計算機</title>
+    <style>
+        :root {
+            --primary-bg: #f9f5f0;
+            --card-bg: #ffffff;
+            --accent-color: #d4a373; /* 奶油焦糖色 */
+            --text-color: #5d574f;
+            --border-color: #eee4da;
+            --shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            font-family: -apple-system, "Noto Sans TC", sans-serif;
+            background-color: var(--primary-bg);
+            color: var(--text-color);
+            margin: 0; padding: 20px 20px 100px 20px;
+            line-height: 1.6;
+        }
+
+        h1, h2 { text-align: center; font-weight: 300; letter-spacing: 2px; }
+        .logo { font-size: 1.2rem; color: var(--accent-color); margin-bottom: 5px; }
+        .title { font-size: 1.8rem; margin-top: 0; margin-bottom: 25px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow);
+        }
+
+        .section-title { font-size: 1rem; margin-bottom: 15px; border-left: 4px solid var(--accent-color); padding-left: 10px; }
+
+        /* 表單元素 */
+        select, input {
+            width: 100%;
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            background: #fff;
+            font-size: 16px; /* 防止 iOS 自動放大 */
+            color: var(--text-color);
+            outline: none;
+        }
+
+        /* 頂部快選列 */
+        .toolbar {
+            display: flex;
+            overflow-x: auto;
+            gap: 10px;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+            scrollbar-width: none;
+        }
+        .toolbar::-webkit-scrollbar { display: none; }
+        .capsule {
+            flex: 0 0 auto;
+            background: #fff;
+            border: 1px solid var(--accent-color);
+            color: var(--accent-color);
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .capsule:active { background: var(--accent-color); color: white; }
+
+        /* 動態列表 */
+        .item-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr auto;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 10px;
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .stepper {
+            display: flex;
+            align-items: center;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .stepper button {
+            background: #fdfdfd;
+            border: none;
+            padding: 8px 10px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .stepper span { flex: 1; text-align: center; min-width: 30px; }
+
+        .btn-remove { color: #cc7a7a; background: none; border: none; font-size: 20px; cursor: pointer; }
+
+        /* 卸甲按鈕組 */
+        .segmented-control {
+            display: flex;
+            background: #f0ede9;
+            border-radius: 12px;
+            padding: 4px;
+            margin-bottom: 15px;
+        }
+        .segmented-control label {
+            flex: 1;
+            text-align: center;
+            padding: 8px;
+            cursor: pointer;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .segmented-control input { display: none; }
+        .segmented-control input:checked + span {
+            background: white;
+            display: block;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        /* 懸浮底部 */
+        .sticky-footer {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            background: white;
+            padding: 15px 25px calc(env(safe-area-inset-bottom) + 15px) 25px;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+        }
+        .total-box { font-size: 1.1rem; }
+        .total-amount { font-size: 1.5rem; font-weight: bold; color: var(--accent-color); }
+        .btn-main {
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-size: 15px;
+            cursor: pointer;
+        }
+
+        /* Modal / Bottom Sheet */
+        #modalOverlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.4);
+            display: none; z-index: 200;
+        }
+        #bottomSheet {
+            position: fixed;
+            bottom: -100%; left: 0; right: 0;
+            background: white;
+            border-radius: 25px 25px 0 0;
+            padding: 30px 25px;
+            transition: bottom 0.4s ease;
+            z-index: 201;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .receipt-line { display: flex; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px dashed #eee; padding-bottom: 5px; }
+        .btn-copy { width: 100%; background: #5d574f; color: white; margin-top: 20px; border: none; padding: 15px; border-radius: 12px; }
+
+        /* 後台設定 */
+        .admin-toggle { text-align: center; font-size: 12px; color: #ccc; margin-top: 50px; cursor: pointer; }
+        .admin-panel { display: none; margin-top: 20px; border-top: 1px dashed #ccc; padding-top: 20px; }
+    </style>
+</head>
+<body>
+
+    <div class="logo">D.studio</div>
+    <h1 class="title">Nail's Menu</h1>
+
+    <div class="card">
+        <div class="section-title">基礎底價</div>
+        <select id="basePriceSelect" onchange="calculateTotal()">
+            <option value="0">請選擇底價項目</option>
+            </select>
+    </div>
+
+    <div class="card">
+        <div class="section-title">固定加購</div>
+        <div id="fixedAddonsList">
+            </div>
+    </div>
+
+    <div class="card">
+        <div class="section-title">進階造型設計</div>
+        <div class="toolbar" id="toolbar">
+            <div class="capsule" onclick="addItem('手繪', 100)">+ 手繪</div>
+            <div class="capsule" onclick="addItem('滿鑽', 200)">+ 滿鑽</div>
+            <div class="capsule" onclick="addItem('法式', 150)">+ 法式</div>
+            <div class="capsule" onclick="addItem('貓眼', 100)">+ 貓眼</div>
+            <div class="capsule" onclick="addItem('延甲', 150)">+ 延甲</div>
+        </div>
+        <div id="dynamicItems"></div>
+    </div>
+
+    <div class="card">
+        <div class="section-title">卸甲與特殊</div>
+        <div class="segmented-control">
+            <label><input type="radio" name="removal" value="0" checked onchange="calculateTotal()"><span>無</span></label>
+            <label><input type="radio" name="removal" value="200" onchange="calculateTotal()"><span>本店續作</span></label>
+            <label><input type="radio" name="removal" value="300" onchange="calculateTotal()"><span>他店續作</span></label>
+        </div>
+        <div class="item-row">
+            <span>立體卸除加價 (指)</span>
+            <span>$50</span>
+            <div class="stepper">
+                <button onclick="updateStepper('specialRemovalCount', -1)">-</button>
+                <span id="specialRemovalCount">0</span>
+                <button onclick="updateStepper('specialRemovalCount', 1)">+</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="section-title">其他金額調整</div>
+        <input type="number" id="adjustmentPrice" placeholder="輸入折扣或加價 (例: -100)" oninput="calculateTotal()" onfocus="this.select()">
+    </div>
+
+    <div class="sticky-footer">
+        <div class="total-box">
+            總計 <span class="total-amount">$<span id="displayTotal">0</span></span>
+        </div>
+        <button class="btn-main" onclick="toggleSheet(true)">👁️ 查看明細</button>
+    </div>
+
+    <div id="modalOverlay" onclick="toggleSheet(false)"></div>
+    <div id="bottomSheet">
+        <h3 style="text-align:center">電子帳單明細</h3>
+        <div id="receiptContent"></div>
+        <button class="btn-copy" onclick="copyReceipt()">📋 複製明細</button>
+    </div>
+
+    <div class="admin-toggle" onclick="toggleAdmin()">⚙️ 後台設定 (管理員專用)</div>
+    <div id="adminPanel" class="admin-panel card">
+        <div class="section-title">底價管理 (JSON格式)</div>
+        <textarea id="basePriceConfig" rows="5" style="width:100%"></textarea>
+        <button class="btn-main" onclick="saveConfig()" style="width:100%; margin-top:10px">儲存並刷新</button>
+    </div>
+
+    <script>
+        // 預設資料 (可透過後台修改)
+        let config = {
+            basePrices: [
+                { name: "單色", price: 1000 },
+                { name: "漸層", price: 1200 },
+                { name: "法式", price: 1400 },
+                { name: "手部基礎保養", price: 400 },
+                { name: "足部深層保濕", price: 1400 }
+            ],
+            fixedAddons: [
+                { name: "足部凝膠 (與手同價)", price: 0 }
+            ]
+        };
+
+        // 初始化
+        window.onload = () => {
+            const saved = localStorage.getItem('nail_config');
+            if(saved) config = JSON.parse(saved);
+            renderConfig();
+            document.getElementById('basePriceConfig').value = JSON.stringify(config, null, 2);
+        };
+
+        function renderConfig() {
+            const select = document.getElementById('basePriceSelect');
+            select.innerHTML = '<option value="0">請選擇底價項目</option>';
+            config.basePrices.forEach(item => {
+                select.innerHTML += `<option value="${item.price}">${item.name} ($${item.price})</option>`;
+            });
+
+            const addonsDiv = document.getElementById('fixedAddonsList');
+            addonsDiv.innerHTML = '';
+            config.fixedAddons.forEach((item, index) => {
+                addonsDiv.innerHTML += `
+                    <label style="display:flex; align-items:center; margin-bottom:10px">
+                        <input type="checkbox" style="width:20px; margin-right:10px" class="addon-check" data-name="${item.name}" data-price="${item.price}" onchange="calculateTotal()"> 
+                        ${item.name} (+$${item.price})
+                    </label>
+                `;
+            });
+        }
+
+        // 動態項目
+        function addItem(name = "", price = 0) {
+            const container = document.getElementById('dynamicItems');
+            const row = document.createElement('div');
+            row.className = 'item-row dynamic-item';
+            row.innerHTML = `
+                <input type="text" value="${name}" placeholder="名稱" class="d-name" oninput="calculateTotal()">
+                <input type="number" value="${price}" class="d-price" oninput="calculateTotal()" onfocus="handleFocus(this)">
+                <div class="stepper">
+                    <button onclick="changeQty(this, -1)">-</button>
+                    <span class="d-qty">1</span>
+                    <button onclick="changeQty(this, 1)">+</button>
+                </div>
+                <button class="btn-remove" onclick="this.parentElement.remove(); calculateTotal();">×</button>
+            `;
+            container.appendChild(row);
+            calculateTotal();
+            
+            // 自動捲動到新項目
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function handleFocus(el) {
+            el.select();
+            // 避免鍵盤遮擋，稍微延遲等待鍵盤彈出
+            setTimeout(() => {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 300);
+        }
+
+        function changeQty(btn, delta) {
+            const span = btn.parentElement.querySelector('.d-qty');
+            let val = parseInt(span.innerText) + delta;
+            if(val < 1) val = 1;
+            span.innerText = val;
+            calculateTotal();
+        }
+
+        function updateStepper(id, delta) {
+            const el = document.getElementById(id);
+            let val = parseInt(el.innerText) + delta;
+            if(val < 0) val = 0;
+            el.innerText = val;
+            calculateTotal();
+        }
+
+        // 計算核心
+        function calculateTotal() {
+            let total = 0;
+            
+            // 1. 底價
+            total += parseInt(document.getElementById('basePriceSelect').value);
+
+            // 2. 固定加購
+            document.querySelectorAll('.addon-check:checked').forEach(el => {
+                total += parseInt(el.dataset.price);
+            });
+
+            // 3. 動態項目
+            document.querySelectorAll('.dynamic-item').forEach(row => {
+                const p = parseInt(row.querySelector('.d-price').value) || 0;
+                const q = parseInt(row.querySelector('.d-qty').innerText) || 0;
+                total += (p * q);
+            });
+
+            // 4. 卸甲
+            const removalBase = parseInt(document.querySelector('input[name="removal"]:checked').value);
+            const removalSpecial = parseInt(document.getElementById('specialRemovalCount').innerText) * 50;
+            total += (removalBase + removalSpecial);
+
+            // 5. 調整
+            total += (parseInt(document.getElementById('adjustmentPrice').value) || 0);
+
+            document.getElementById('displayTotal').innerText = total.toLocaleString();
+            return total;
+        }
+
+        // 明細功能
+        function toggleSheet(show) {
+            const sheet = document.getElementById('bottomSheet');
+            const overlay = document.getElementById('modalOverlay');
+            if(show) {
+                generateReceipt();
+                overlay.style.display = 'block';
+                setTimeout(() => sheet.style.bottom = '0', 10);
+            } else {
+                sheet.style.bottom = '-100%';
+                setTimeout(() => overlay.style.display = 'none', 400);
+            }
+        }
+
+        function generateReceipt() {
+            const content = document.getElementById('receiptContent');
+            let html = '';
+            
+            // 底價
+            const baseSelect = document.getElementById('basePriceSelect');
+            if(baseSelect.value !== "0") {
+                html += `<div class="receipt-line"><span>${baseSelect.options[baseSelect.selectedIndex].text.split(' (')[0]}</span><span>$${baseSelect.value}</span></div>`;
+            }
+
+            // 加購
+            document.querySelectorAll('.addon-check:checked').forEach(el => {
+                html += `<div class="receipt-line"><span>${el.dataset.name}</span><span>$${el.dataset.price}</span></div>`;
+            });
+
+            // 動態
+            document.querySelectorAll('.dynamic-item').forEach(row => {
+                const name = row.querySelector('.d-name').value || "未命名項目";
+                const p = row.querySelector('.d-price').value;
+                const q = row.querySelector('.d-qty').innerText;
+                html += `<div class="receipt-line"><span>${name} x${q}</span><span>$${p*q}</span></div>`;
+            });
+
+            // 卸甲
+            const remVal = document.querySelector('input[name="removal"]:checked').value;
+            if(remVal !== "0") {
+                const remName = document.querySelector('input[name="removal"]:checked').parentElement.innerText;
+                html += `<div class="receipt-line"><span>卸甲 (${remName})</span><span>$${remVal}</span></div>`;
+            }
+            const specRem = parseInt(document.getElementById('specialRemovalCount').innerText);
+            if(specRem > 0) {
+                html += `<div class="receipt-line"><span>立體卸除 x${specRem}</span><span>$${specRem*50}</span></div>`;
+            }
+
+            // 調整
+            const adj = parseInt(document.getElementById('adjustmentPrice').value) || 0;
+            if(adj !== 0) {
+                html += `<div class="receipt-line"><span>金額調整</span><span>$${adj}</span></div>`;
+            }
+
+            html += `<div class="receipt-line" style="border-top:2px solid #5d574f; margin-top:15px; font-weight:bold; font-size:1.2rem"><span>總計</span><span>$${calculateTotal()}</span></div>`;
+            content.innerHTML = html;
+        }
+
+        function copyReceipt() {
+            let text = "✨ D.studio 電子帳單 ✨\n------------------\n";
+            const lines = document.querySelectorAll('.receipt-line');
+            lines.forEach(l => {
+                text += l.innerText.replace('\n', ' ') + "\n";
+            });
+            text += "------------------\n期待下次見面 ♡";
+            
+            navigator.clipboard.writeText(text).then(() => {
+                alert('明細已複製到剪貼簿！');
+            });
+        }
+
+        // 後台管理
+        function toggleAdmin() {
+            const panel = document.getElementById('adminPanel');
+            panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+        }
+
+        function saveConfig() {
+            try {
+                const newConfig = JSON.parse(document.getElementById('basePriceConfig').value);
+                localStorage.setItem('nail_config', JSON.stringify(newConfig));
+                config = newConfig;
+                renderConfig();
+                alert('設定儲存成功！');
+            } catch(e) {
+                alert('格式錯誤，請檢查 JSON 格式');
+            }
+        }
+    </script>
+</body>
+</html>
